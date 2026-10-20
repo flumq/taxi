@@ -126,6 +126,19 @@ st.markdown(
     text-align: center;
     margin: auto;
 }
+
+/* 📱 모바일 화면 최적화 (반응형 미디어 쿼리) */
+@media (max-width: 768px) {
+    .board {
+        grid-template-columns: 1fr !important;
+    }
+    .glabel {
+        margin-top: 12px;
+        padding-left: 0;
+        border-bottom: 2px solid #dcd9d0;
+        padding-bottom: 6px;
+    }
+}
 </style>
 """,
     unsafe_allow_html=True,
@@ -134,92 +147,92 @@ st.markdown(
 
 # ---------- 핵심 로테이션 계산 함수 (차량별 고정 규칙 사후 필터링 방식) ----------
 def generate_training_schedule(start_no, end_no, car_names, absent_str):
-  absents = []
-  if absent_str:
-    for x in absent_str.replace(',', ' ').split():
-      if x.isdigit():
-        absents.append(int(x))
+    absents = []
+    if absent_str:
+        for x in absent_str.replace(',', ' ').split():
+            if x.isdigit():
+                absents.append(int(x))
 
-  num_cars = len(car_names)
-  if num_cars == 0:
-    return []
+    num_cars = len(car_names)
+    if num_cars == 0:
+        return []
 
-  group_capacity = num_cars * 4
-  all_groups_data = []
+    group_capacity = num_cars * 4
+    all_groups_data = []
 
-  current_start = start_no
-  group_num = 1
-  global_cum_lap = 0
+    current_start = start_no
+    group_num = 1
+    global_cum_lap = 0
 
-  while current_start <= end_no:
-    current_end = min(current_start + group_capacity - 1, end_no)
-    grp_all_nums = list(range(current_start, current_end + 1))
+    while current_start <= end_no:
+        current_end = min(current_start + group_capacity - 1, end_no)
+        grp_all_nums = list(range(current_start, current_end + 1))
 
-    if not grp_all_nums:
-      break
+        if not grp_all_nums:
+            break
 
-    grp_range_str = f'{grp_all_nums[0]}~{grp_all_nums[-1]}번'
+        grp_range_str = f'{grp_all_nums[0]}~{grp_all_nums[-1]}번'
 
-    car_assignments = {}
-    car_targets = {}
+        car_assignments = {}
+        car_targets = {}
 
-    # 원래 조 대역을 먼저 차량별 고정 규칙으로 배정한 뒤, 결석자만 제외
-    for c_idx, car in enumerate(car_names):
-      original_car_studs = grp_all_nums[c_idx::num_cars]
-      car_studs = [s for s in original_car_studs if s not in absents]
+        # 원래 조 대역을 먼저 차량별 고정 규칙으로 배정한 뒤, 결석자만 제외
+        for c_idx, car in enumerate(car_names):
+            original_car_studs = grp_all_nums[c_idx::num_cars]
+            car_studs = [s for s in original_car_studs if s not in absents]
 
-      car_assignments[car] = car_studs
-      car_targets[car] = len(car_studs) * 2  # 인원당 2바퀴
+            car_assignments[car] = car_studs
+            car_targets[car] = len(car_studs) * 2  # 인원당 2바퀴
 
-    # 퇴장 누적 회차 시뮬레이션
-    car_laps_done = {car: 0 for car in car_names}
-    exit_laps = {}
-    group_local_lap = 0
-    total_needed = sum(car_targets.values())
+        # 퇴장 누적 회차 시뮬레이션
+        car_laps_done = {car: 0 for car in car_names}
+        exit_laps = {}
+        group_local_lap = 0
+        total_needed = sum(car_targets.values())
 
-    if total_needed > 0:
-      while sum(car_laps_done.values()) < total_needed:
-        for car in car_names:
-          if car_laps_done[car] < car_targets[car]:
-            global_cum_lap += 1
-            group_local_lap += 1
-            car_laps_done[car] += 1
-            if car_laps_done[car] == car_targets[car] and car not in exit_laps:
-              exit_laps[car] = global_cum_lap
+        if total_needed > 0:
+            while sum(car_laps_done.values()) < total_needed:
+                for car in car_names:
+                    if car_laps_done[car] < car_targets[car]:
+                        global_cum_lap += 1
+                        group_local_lap += 1
+                        car_laps_done[car] += 1
+                        if car_laps_done[car] == car_targets[car] and car not in exit_laps:
+                            exit_laps[car] = global_cum_lap
 
-    all_groups_data.append({
-        'group_num': group_num,
-        'range_str': grp_range_str,
-        'car_assignments': car_assignments,
-        'car_targets': car_targets,
-        'exit_laps': exit_laps,
-        'total_laps': group_local_lap,
-    })
+        all_groups_data.append({
+            'group_num': group_num,
+            'range_str': grp_range_str,
+            'car_assignments': car_assignments,
+            'car_targets': car_targets,
+            'exit_laps': exit_laps,
+            'total_laps': group_local_lap,
+        })
 
-    current_start += group_capacity
-    group_num += 1
+        current_start += group_capacity
+        group_num += 1
 
-  return all_groups_data
+    return all_groups_data
 
 
 # ---------- 카드 HTML ----------
 def render_card(car, studs, target_laps, exit_lap):
-  if not studs:
+    if not studs:
+        return (
+            '<div class="card">'
+            f'<div class="car">🚘 {html.escape(car)}</div>'
+            '<div class="empty">주행 없음</div>'
+            '</div>'
+        )
+    badges = ''.join(f'<span class="badge">{s}</span>' for s in studs)
     return (
         '<div class="card">'
         f'<div class="car">🚘 {html.escape(car)}</div>'
-        '<div class="empty">주행 없음</div>'
+        f'<div class="stat">{len(studs)}명 · {target_laps}바퀴</div>'
+        f'<div class="badges">{badges}</div>'
+        f'<div class="exit">🏁 <span class="num">{exit_lap}</span>번째 바퀴 후 정차</div>'
         '</div>'
     )
-  badges = ''.join(f'<span class="badge">{s}</span>' for s in studs)
-  return (
-      '<div class="card">'
-      f'<div class="car">🚘 {html.escape(car)}</div>'
-      f'<div class="stat">{len(studs)}명 · {target_laps}바퀴</div>'
-      f'<div class="badges">{badges}</div>'
-      f'<div class="exit">🏁 <span class="num">{exit_lap}</span>번째 바퀴 후 정차</div>'
-      '</div>'
-  )
 
 
 # ---------- 사이드바 입력 ----------
@@ -240,9 +253,9 @@ absent_str = st.sidebar.text_input(
 )
 
 if len(car_names) != num_cars:
-  st.sidebar.warning(
-      f'차량 대수({num_cars}대)와 차량 번호 개수({len(car_names)}개)가 다릅니다.'
-  )
+    st.sidebar.warning(
+        f'차량 대수({num_cars}대)와 차량 번호 개수({len(car_names)}개)가 다릅니다.'
+    )
 
 # ---------- 본문 ----------
 st.markdown('<div class="title">🚗 교육생 차량 주행 및 조 편성</div>', unsafe_allow_html=True)
@@ -250,44 +263,44 @@ st.markdown('<div class="title">🚗 교육생 차량 주행 및 조 편성</div
 results = generate_training_schedule(start_no, end_no, car_names, absent_str)
 
 if not results:
-  st.warning('조건에 맞는 교육생이 없거나 차량 번호 설정이 올바르지 않습니다.')
+    st.warning('조건에 맞는 교육생이 없거나 차량 번호 설정이 올바르지 않습니다.')
 else:
-  absent_count = len([x for x in absent_str.replace(',', ' ').split() if x.isdigit()])
-  total_students = sum(
-      len(studs) for g in results for studs in g['car_assignments'].values()
-  )
-
-  st.markdown(
-      f'<div class="summary">총 <b>{total_students}명</b> · '
-      f'<b>{len(results)}조</b> · 결석 <b>{absent_count}명</b> · '
-      f'운행 <b>{len(car_names)}대</b></div>',
-      unsafe_allow_html=True,
-  )
-  st.markdown(
-      '<div class="caption">※ 번호는 전체 누적 바퀴 기준입니다.</div>',
-      unsafe_allow_html=True,
-  )
-
-  cells = []
-  for g in results:
-    cells.append(
-        f'<div class="glabel"><b>{g["group_num"]}조</b>'
-        f'<span>{g["range_str"]}</span></div>'
+    absent_count = len([x for x in absent_str.replace(',', ' ').split() if x.isdigit()])
+    total_students = sum(
+        len(studs) for g in results for studs in g['car_assignments'].values()
     )
-    for car in car_names:
-      cells.append(
-          render_card(
-              car,
-              g['car_assignments'].get(car, []),
-              g['car_targets'].get(car, 0),
-              g['exit_laps'].get(car, 0),
-          )
-      )
 
-  st.markdown(
-      f'<div class="board" style="grid-template-columns: '
-      f'clamp(80px, 7vw, 120px) repeat({len(car_names)}, 1fr);">'
-      + ''.join(cells)
-      + '</div>',
-      unsafe_allow_html=True,
-  )
+    st.markdown(
+        f'<div class="summary">총 <b>{total_students}명</b> · '
+        f'<b>{len(results)}조</b> · 결석 <b>{absent_count}명</b> · '
+        f'운행 <b>{len(car_names)}대</b></div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        '<div class="caption">※ 번호는 전체 누적 바퀴 기준입니다.</div>',
+        unsafe_allow_html=True,
+    )
+
+    cells = []
+    for g in results:
+        cells.append(
+            f'<div class="glabel"><b>{g["group_num"]}조</b>'
+            f'<span>{g["range_str"]}</span></div>'
+        )
+        for car in car_names:
+            cells.append(
+                render_card(
+                    car,
+                    g['car_assignments'].get(car, []),
+                    g['car_targets'].get(car, 0),
+                    g['exit_laps'].get(car, 0),
+                )
+            )
+
+    st.markdown(
+        f'<div class="board" style="grid-template-columns: '
+        f'clamp(80px, 7vw, 120px) repeat({len(car_names)}, 1fr);">'
+        + ''.join(cells)
+        + '</div>',
+        unsafe_allow_html=True,
+    )
